@@ -68,7 +68,7 @@ def calcDistrStatistic(obs, model, statistics, n_samples):
     else:
         nmonths = 1
         # Added next line for testing
-        model = model.reshape(model.shape[1], model.shape[0])
+        model = model.reshape(model.shape[0], model.shape[1])
 
 
     obs_stats_dict = {}
@@ -118,7 +118,7 @@ def calcDistrStatistic(obs, model, statistics, n_samples):
 # In[6]:
 
 
-def timeseries_fid_test(obs, mod):
+def timeseries_fid_test(obs, model):
     '''
     Parameters
     ----------
@@ -138,7 +138,7 @@ def timeseries_fid_test(obs, mod):
     # calculate distribution statistics
     print('calculating distribution statistics')
     N_SAMPLES     = 10000   # number of proxy timeseries used
-    obs_stats_dict, mod_stats_dict = calcDistrStatistic(obs.data, mod.data, ['mean', 'std', 'skew', 'kurt', 'linear_trend'], N_SAMPLES)
+    obs_stats_dict, mod_stats_dict = calcDistrStatistic(obs, model, ['mean', 'std', 'skew', 'kurt', 'linear_trend'], N_SAMPLES)
 
     # Outputs where the obs lies as a percentage of the modelled values
     print('calculating percentiles')
@@ -167,15 +167,29 @@ def plotStatsMeasures(obs_stat, mod_stat, stat_perc, posrow, poscol, title, xtic
     n = plt.hist(mod_stat, bins=21, histtype='stepfilled', 
                  color='r', alpha=0.5, label='Mod')
     plt.axvline(obs_stat, color='k', label='Obs')
-    plt.title('{}, {:.0f}%'.format(title, stat_perc))
+    
+    # 设置标题字体大小
+    plt.title('{}, {:.0f}%'.format(title, stat_perc), fontsize=12)
+    
     plt.yticks([], [])
-    #plt.xticks(xticks, xticks)
+    
+    # 设置 x 轴刻度标签和字体大小
+    plt.xticks(fontsize=10)
+    
+    # 设置坐标轴标签字体大小（如果需要）
+    #plt.xlabel("X轴标签", fontsize=10)
+    
+    # 设置图例字体大小
+    plt.legend(fontsize=10)
+    
+    # 调整子图以适应标题和标签
+    plt.tight_layout()
 
 
 # In[8]:
 
 
-def get_cube_limits(cube):
+def get_cube_limits(data):
     '''A function to return the min and max values from a cube
 
     Input args:
@@ -187,30 +201,30 @@ def get_cube_limits(cube):
     vmin - the minimum value in the cube
     vmin - the maximum value in the cube
     '''
-    vmin = cube.data.min()
-    vmax = cube.data.max()
+    vmin = data.min()
+    vmax = data.max()
     return vmin, vmax
 
 
 # In[9]:
 
 
-def plot_fidelity_testing(obs, mod, stats_measures, step, title, fname):
-
-    mod_min, mod_max = get_cube_limits(mod)
+def plot_fidelity_testing(obs, model, stats_measures, step, title, fname):
+    plt.rcParams.update({'font.size': 12})
+    mod_min, mod_max = get_cube_limits(model)
     obs_min, obs_max = get_cube_limits(obs)
     xmin = math.trunc(min(mod_min.astype('float'), obs_min.astype('float')))
     xmax = math.ceil(max(mod_max.astype('float'), obs_max.astype('float')))
 
     print('plotting')
     fig = plt.figure(figsize=(10., 5.))
-
+    
     NROWS = 2
     NCOLS = 4
     ax = plt.subplot2grid((NROWS, NCOLS), (0, 0), colspan=2, rowspan=2)
-    ax = plt.hist(mod.data.ravel(), bins=10, density=True, stacked=True, histtype='stepfilled', \
+    ax = plt.hist(model.ravel(), bins=10, density=True, stacked=True, histtype='stepfilled', \
                   color='salmon', label='Mod')
-    ax = plt.hist(obs.data.ravel(), bins=10, density=True, stacked=True, histtype='stepfilled', \
+    ax = plt.hist(obs.ravel(), bins=10, density=True, stacked=True, histtype='stepfilled', \
                   color='k', alpha=.5, label='Obs')
 
     plt.yticks([])
@@ -237,31 +251,49 @@ def plot_fidelity_testing(obs, mod, stats_measures, step, title, fname):
     HSPACE = 0.28
     plt.subplots_adjust(left=LEFT, bottom=BOTTOM, right=RIGHT, top=TOP,
                         wspace=WSPACE, hspace=HSPACE)
-   # plt.suptitle(title)
+    plt.suptitle(title)
     plt.show()
 
 
-def mean_bias_correction(obs, model):
-    """
-    Perform mean bias correction on the model data.
-    
-    Parameters:
-    obs (np.array): Observed values, shape (n_months,)
-    model (np.array): Model forecast values, shape (n_ensembles, n_months)
-    
-    Returns:
-    np.array: Bias-corrected model values, same shape as input model
-    """
-    # Calculate the mean across all ensembles and months
-    model_mean = np.mean(model)
-    obs_mean = np.mean(obs)
-    
-    # Calculate the correction factor
-    correction_factor = obs_mean / model_mean
-    
-    # Apply the correction factor to the model data
-    model_biascor = model * correction_factor
-    
-    return model_biascor
+def fidelity_testing_compare(obs, mod, mod_cor, stats_measures, stats_measures_cor, step, title, fname):
+    fig = plt.figure(figsize=(16, 12))
+
+    # 主分布图
+    ax_main = plt.subplot2grid((3, 4), (0, 0), colspan=2, rowspan=2)
+    ax_main.hist(mod.data.ravel(), bins=20, density=True, alpha=0.5, histtype='stepfilled', 
+                 color='red', label='Mod')
+    ax_main.hist(mod_cor.data.ravel(), bins=20, density=True, alpha=0.5, histtype='stepfilled', 
+                 color='lightblue', label='Mod (Corrected)')
+    ax_main.hist(obs.data.ravel(), bins=20, density=True, alpha=0.5, histtype='stepfilled', 
+                 color='k', label='Obs')
+    ax_main.set_yticks([])
+    ax_main.legend(loc='upper right', prop={'size': 12})
+    ax_main.set_title('Distribution Comparison', fontsize=14)
+    ax_main.set_xlabel('Value', fontsize=12)
+    STAT_TITLES = ['Mean', 'StdDev', 'Skewness', 'Kurtosis']
+    for i, stat in enumerate(['mean', 'std', 'skew', 'kurt']):
+        ax = plt.subplot2grid((3, 4), (2, i))
+        
+        obs_stat = stats_measures[0][stat]
+        mod_stat = stats_measures[1][stat]
+        mod_cor_stat = stats_measures_cor[1][stat]
+        
+        ax.hist(mod_stat, bins=20, density=True, alpha=0.5, histtype='stepfilled', 
+                color='red', label='Mod')
+        ax.hist(mod_cor_stat, bins=20, density=True, alpha=0.5, histtype='stepfilled', 
+                color='lightblue', label='Mod (Corrected)')
+        ax.axvline(obs_stat, color='k', linestyle='--', label='Obs')
+        
+        ax.set_title(STAT_TITLES[i])
+        ax.set_yticks([])
+        if i == 0:
+            ax.legend(loc='upper right', prop={'size': 8})
+
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.9)
+    plt.suptitle(title, fontsize=12)
+    plt.savefig(fname, dpi=300, bbox_inches='tight')
+    plt.show()
+
 
 
